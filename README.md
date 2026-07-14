@@ -97,7 +97,7 @@ export ANTHROPIC_API_KEY=<your key>            # --model="anthropic/claude-sonne
 
 # AWS Bedrock (uses your AWS credentials; enable the Claude models in the
 # Bedrock console for your region first)
-export AWS_DEFAULT_REGION=us-east-1            # --model="bedrock/us.anthropic.claude-sonnet-4-6"
+export AWS_DEFAULT_REGION=us-east-2            # --model="bedrock/us.anthropic.claude-sonnet-4-6"
 ```
 
 ### The demo
