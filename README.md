@@ -163,6 +163,11 @@ Cursor): enroll the MCP server behind Teleport once; every user's AI gets one
 config entry, and Teleport enforces *which tools* each identity may call —
 auditing every call with its arguments.
 
+A key difference from Part 1: here the AI rides a **human login** (`tsh login`
+underneath), so just-in-time elevation works — the *human* requests a role and
+their AI inherits it. Bot identities cannot make Access Requests, which is why
+Part 1's agent has fixed privileges and hands off to a human instead.
+
 ### Setup (~10 minutes, reuses an existing Teleport agent)
 
 **1. Enroll the MCP server** — merge `mcp/app-snippet.yaml` into an existing
@@ -207,10 +212,13 @@ full access arrives only because the admin role itself carries no deny.
 
 ## Notes
 
-- **Bots cannot make Access Requests** — by design. When the autonomous agent
-  needs a destructive fix, it hands off to a human, who elevates through the
-  normal just-in-time approval flow (MFA, approvers, session recording).
-  Agents diagnose; humans approve destruction.
+- **Bots cannot make Access Requests** — by design, so there is no JIT for the
+  Part 1 agent itself. When it needs a destructive fix, it hands off to a
+  human, who elevates through the normal just-in-time approval flow (MFA,
+  approvers, session recording). Agents diagnose; humans approve destruction.
+  (To change a bot's privileges, an admin runs
+  `tctl bots update <bot> --add-roles <role>` — explicit and audited, not a
+  request. Part 2's JIT works because that path rides a human login.)
 - The tbot output works for anything that speaks kubeconfig — Helm, ArgoCD,
   k9s, your own scripts — Part 1 just happens to hand it to an AI.
 - HolmesGPT has other toolsets (Prometheus, PagerDuty, …); the pattern here
