@@ -17,6 +17,10 @@ services:
     selectors:
       # Each matching cluster becomes a kubeconfig context. The bot's ROLE is
       # what actually limits access — these just pick what to write out.
+      # The FIRST selected cluster becomes the default context, and tbot
+      # resets current-context to it on every renewal — so name the cluster
+      # your demo targets first.
+      # - name: my-demo-cluster
       - labels: { env: dev }
       - labels: { env: demo }
     destination:
