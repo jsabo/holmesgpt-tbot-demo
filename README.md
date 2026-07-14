@@ -135,7 +135,8 @@ tsh kube login <cluster> && kubectl apply -f k8s/broken-pod.yaml   # human, own 
 
 export KUBECONFIG=$PWD/machine-id/kubeconfig.yaml                  # back to the bot
 holmes ask "pods are crashing in namespace demo-incident — find the root cause" \
-  --model="bedrock/us.anthropic.claude-sonnet-4-6"   # or anthropic/claude-sonnet-4-5
+  --model="bedrock/us.anthropic.claude-sonnet-4-6" \
+  --no-interactive   # plain scripted output; or anthropic/claude-sonnet-4-5
 ```
 
 HolmesGPT walks the cluster read-only (pods, logs, events) and lands on the
