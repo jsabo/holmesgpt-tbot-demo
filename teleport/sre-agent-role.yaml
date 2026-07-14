@@ -1,14 +1,10 @@
-# The AI agent's guardrails. Two layers, both enforced by Teleport's proxy —
-# it does not matter what the LLM decides to run:
-#
-#   kubernetes_labels     which CLUSTERS exist for the bot (env=prod never
-#                         matches, so production is invisible, not just denied)
-#   kubernetes_resources  read-only VERBS, even if the kube-side group were
-#                         ever bound to something broader
-#
-# kubernetes_groups is what the Teleport proxy impersonates on the kube API;
-# bind it to the built-in "view" ClusterRole in each allowed cluster (README
-# step 1).
+# The AI agent's guardrails, enforced at Teleport's proxy no matter what the
+# LLM decides to run:
+#   kubernetes_labels    → which clusters exist for the bot (env=prod never
+#                          matches: production is invisible, not just denied)
+#   kubernetes_resources → read-only verbs
+#   kubernetes_groups    → impersonated on the kube API; bind "view" to the
+#                          built-in view ClusterRole per cluster (README step 1)
 kind: role
 version: v8
 metadata:

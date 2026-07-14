@@ -15,13 +15,11 @@ storage:
 services:
   - type: kubernetes/v2
     selectors:
-      # Name selectors and label selectors both work; every matching cluster
-      # becomes a context in the generated kubeconfig. Wildcards are not
-      # supported here — but the bot's ROLE is what actually limits access.
+      # Each matching cluster becomes a kubeconfig context. The bot's ROLE is
+      # what actually limits access — these just pick what to write out.
       - labels: { env: dev }
       - labels: { env: demo }
     destination:
       type: directory
       path: ./machine-id
-      symlinks: insecure   # macOS demo hosts: tbot may still WARN about symlinks
-                           # per kubectl call — cosmetic only, absent on Linux
+      symlinks: insecure   # quiets a cosmetic macOS warning; absent on Linux

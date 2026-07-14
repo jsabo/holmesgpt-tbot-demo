@@ -15,6 +15,14 @@ This repo demos Teleport answering all three, for both kinds of agent:
   **per-tool RBAC** (the agent literally cannot see denied tools), just-in-time
   elevation a human approves, and per-tool-call audit.
 
+```
+teleport/sre-agent-role.yaml   the autonomous bot's guardrails (Part 1)
+tbot.yaml                      machine-identity config → kubeconfig (Part 1)
+k8s/broken-pod.yaml            canned incident for HolmesGPT to solve (Part 1)
+mcp/app-snippet.yaml           enroll an MCP server behind Teleport (Part 2)
+mcp/roles/                     per-tool RBAC: read-only + JIT admin (Part 2)
+```
+
 ---
 
 ## Part 1 — Autonomous agent: HolmesGPT + Machine ID
@@ -48,8 +56,8 @@ This repo demos Teleport answering all three, for both kinds of agent:
 - `tctl`/`tsh` logged in as an editor, and [`tbot`
   installed](https://goteleport.com/docs/machine-workload-identity/deployment/)
   on the machine that will run the agent
-- `kubectl`, and an Anthropic (or other
-  [LiteLLM-supported](https://holmesgpt.dev)) API key for HolmesGPT
+- `kubectl`, and LLM credentials for HolmesGPT — an Anthropic API key or AWS
+  Bedrock access (any [LiteLLM-supported](https://holmesgpt.dev) provider works)
 
 ### Setup
 
@@ -88,8 +96,8 @@ brew tap robusta-dev/homebrew-holmesgpt && brew install holmesgpt
 # or: pipx install holmesgpt
 ```
 
-Give it an LLM — either an Anthropic API key, or Claude on **AWS Bedrock**
-(no Anthropic key needed; any LiteLLM-supported provider works):
+Give it an LLM — an Anthropic API key, or Claude on **AWS Bedrock** using
+your existing AWS credentials:
 
 ```bash
 # Anthropic API
@@ -151,9 +159,9 @@ The agent's access dies cluster-wide, mid-investigation, instantly.
 ## Part 2 — Interactive agents: MCP with per-tool RBAC
 
 The same governance for agents a human drives (Claude Code, Claude Desktop,
-Cursor): enroll the MCP server behind Teleport once, and every user's AI gets
-one config entry — while Teleport enforces *which tools* each identity may
-call and audits every call with its arguments.
+Cursor): enroll the MCP server behind Teleport once; every user's AI gets one
+config entry, and Teleport enforces *which tools* each identity may call —
+auditing every call with its arguments.
 
 ### Setup (~10 minutes, reuses an existing Teleport agent)
 
