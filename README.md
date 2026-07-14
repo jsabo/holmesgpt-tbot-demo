@@ -142,9 +142,12 @@ HolmesGPT walks the cluster read-only (pods, logs, events) and lands on the
 planted root cause: the payment service can't reach its database.
 
 **Then show the receipts.** In the Teleport Web UI → Audit Log, filter for
-user `bot-sre-agent`: every single API call the AI just made, each one a
+user `bot-sre-agent`: every API call from the investigation, each one a
 `kube.request` event carrying `bot_name: sre-agent` — side by side with your
-human sessions, in one audit trail.
+human sessions, in one audit trail. (Note: `kube.request` records forwarded
+requests with the upstream status — kube-side denials show as 403s; calls
+rejected by Teleport's own role, like the delete above, are refused at the
+proxy and surface in the client error rather than as an audit row.)
 
 **Optional closer — the kill switch:**
 
