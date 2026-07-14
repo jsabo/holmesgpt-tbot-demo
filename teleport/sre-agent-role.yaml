@@ -1,0 +1,27 @@
+# The AI agent's guardrails. Two layers, both enforced by Teleport's proxy —
+# it does not matter what the LLM decides to run:
+#
+#   kubernetes_labels     which CLUSTERS exist for the bot (env=prod never
+#                         matches, so production is invisible, not just denied)
+#   kubernetes_resources  read-only VERBS, even if the kube-side group were
+#                         ever bound to something broader
+#
+# kubernetes_groups is what the Teleport proxy impersonates on the kube API;
+# bind it to the built-in "view" ClusterRole in each allowed cluster (README
+# step 1).
+kind: role
+version: v8
+metadata:
+  name: sre-agent
+  description: "AI SRE agent: read-only Kubernetes on dev/demo clusters; prod invisible"
+spec:
+  allow:
+    kubernetes_labels:
+      env: ["dev", "demo"]
+    kubernetes_groups: ["view"]
+    kubernetes_resources:
+      - kind: "*"
+        api_group: "*"
+        namespace: "*"
+        name: "*"
+        verbs: ["get", "list", "watch"]

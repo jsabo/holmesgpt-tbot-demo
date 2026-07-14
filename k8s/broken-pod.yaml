@@ -1,0 +1,42 @@
+# A canned incident for HolmesGPT to investigate: a "payment service" that
+# crash-loops with a clear root cause in its logs (unreachable database).
+# Apply as a human admin — the bot's job is to diagnose it, not create it.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-incident
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: demo-incident
+  labels:
+    app: payment-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      labels:
+        app: payment-service
+    spec:
+      containers:
+        - name: payment-service
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "payment-service v2.3.1 starting"
+              echo "loading config from /etc/payment/config.yaml"
+              echo "connecting to database payments-db.demo-incident.svc.cluster.local:5432 ..."
+              sleep 5
+              echo "FATAL: could not connect to database payments-db.demo-incident.svc.cluster.local:5432: connection refused"
+              echo "FATAL: exhausted 3 connection attempts, exiting"
+              exit 1
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { cpu: 50m, memory: 32Mi }

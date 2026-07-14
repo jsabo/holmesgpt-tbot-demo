@@ -1,0 +1,7 @@
+# tbot runtime artifacts — certificates and bot identity live here, never commit
+machine-id/
+tbot-storage/
+
+# local copies with real tenant values / join tokens
+tbot.local.yaml
+*.env

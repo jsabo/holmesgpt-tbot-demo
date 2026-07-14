@@ -1,0 +1,27 @@
+# tbot: the agent's machine identity. Joins Teleport as bot "sre-agent",
+# keeps short-lived certs renewed, and writes an auto-refreshing
+# machine-id/kubeconfig.yaml scoped to the clusters selected below.
+#
+# Copy to tbot.local.yaml (gitignored), fill in proxy_server and token, then:
+#   tbot start -c tbot.local.yaml
+version: v2
+proxy_server: example.teleport.sh:443   # your Teleport proxy
+onboarding:
+  join_method: token
+  token: PASTE_TOKEN_FROM_tctl_bots_add
+storage:
+  type: directory
+  path: ./tbot-storage
+services:
+  - type: kubernetes/v2
+    selectors:
+      # Name selectors and label selectors both work; every matching cluster
+      # becomes a context in the generated kubeconfig. Wildcards are not
+      # supported here — but the bot's ROLE is what actually limits access.
+      - labels: { env: dev }
+      - labels: { env: demo }
+    destination:
+      type: directory
+      path: ./machine-id
+      symlinks: insecure   # macOS demo hosts: tbot may still WARN about symlinks
+                           # per kubectl call — cosmetic only, absent on Linux
