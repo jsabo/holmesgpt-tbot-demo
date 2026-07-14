@@ -1,0 +1,13 @@
+# All MCP tools — held only via an approved Access Request.
+# When granted, the agent's tool list visibly grows on reconnect.
+kind: role
+version: v8
+metadata:
+  name: mcp-agent-admin
+  description: "MCP: all tools (JIT via access request)"
+spec:
+  allow:
+    app_labels:
+      tier: mcp
+    mcp:
+      tools: ["*"]

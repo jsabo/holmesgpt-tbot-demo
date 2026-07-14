@@ -1,0 +1,29 @@
+# AI agent, read-only: can diagnose, cannot change anything.
+# Tool names match kubernetes-mcp-server / openshift-mcp-server — verify with
+# the live tool list after enrolling and adjust globs if needed.
+# Holders can REQUEST mcp-agent-admin just-in-time (a human approves).
+kind: role
+version: v8
+metadata:
+  name: mcp-agent-readonly
+  description: "MCP: read-only tools + can request admin"
+spec:
+  allow:
+    app_labels:
+      tier: mcp
+    mcp:
+      tools:
+        - "*_list"
+        - "*_get"
+        - pods_log
+        - pods_top
+        - events_list
+        - projects_list
+        - configuration_view
+    request:
+      roles: [mcp-agent-admin]
+      reason:
+        mode: "required"
+  deny:
+    mcp:
+      tools: ["pods_exec", "nodes_debug_exec"]

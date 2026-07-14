@@ -1,0 +1,23 @@
+# Enroll a Kubernetes MCP server behind Teleport. Paste into an EXISTING
+# Teleport agent's teleport.yaml (merge with its app_service section) and
+# restart the agent.
+#
+# Needs on the agent host: npx (node), and a kubeconfig for the cluster the
+# MCP server should manage. Docker alternative for the mcp block:
+#   command: "docker"
+#   args: ["run", "-i", "--rm", "-v", "/etc/teleport/demo-kubeconfig:/kc:ro",
+#          "quay.io/manusa/kubernetes_mcp_server:latest", "--kubeconfig", "/kc"]
+app_service:
+  enabled: true
+  apps:
+    - name: kubernetes-mcp
+      description: "Kubernetes/OpenShift MCP server (demo)"
+      labels:
+        tier: mcp
+        env: demo
+      mcp:
+        command: "npx"
+        args: ["-y", "kubernetes-mcp-server@latest", "--kubeconfig", "/etc/teleport/demo-kubeconfig"]
+        # Must be a user that exists on the agent host (inside the container
+        # if the agent runs in docker — e.g. root).
+        run_as_host_user: "teleport"
