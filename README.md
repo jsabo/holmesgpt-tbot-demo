@@ -86,7 +86,18 @@ cluster the bot is allowed to see — and keeps the certificates renewed.
 ```bash
 brew tap robusta-dev/homebrew-holmesgpt && brew install holmesgpt
 # or: pipx install holmesgpt
-export ANTHROPIC_API_KEY=<your key>
+```
+
+Give it an LLM — either an Anthropic API key, or Claude on **AWS Bedrock**
+(no Anthropic key needed; any LiteLLM-supported provider works):
+
+```bash
+# Anthropic API
+export ANTHROPIC_API_KEY=<your key>            # --model="anthropic/claude-sonnet-4-5"
+
+# AWS Bedrock (uses your AWS credentials; enable the Claude models in the
+# Bedrock console for your region first)
+export AWS_DEFAULT_REGION=us-east-1            # --model="bedrock/us.anthropic.claude-sonnet-4-6"
 ```
 
 ### The demo
@@ -116,7 +127,7 @@ tsh kube login <cluster> && kubectl apply -f k8s/broken-pod.yaml   # human, own 
 
 export KUBECONFIG=$PWD/machine-id/kubeconfig.yaml                  # back to the bot
 holmes ask "pods are crashing in namespace demo-incident — find the root cause" \
-  --model="anthropic/claude-sonnet-4-5"
+  --model="bedrock/us.anthropic.claude-sonnet-4-6"   # or anthropic/claude-sonnet-4-5
 ```
 
 HolmesGPT walks the cluster read-only (pods, logs, events) and lands on the
