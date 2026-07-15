@@ -2,13 +2,20 @@
 # keeps short-lived certs renewed, and writes an auto-refreshing
 # machine-id/kubeconfig.yaml scoped to the clusters selected below.
 #
-# Copy to tbot.local.yaml (gitignored), fill in proxy_server and token, then:
+# Copy to tbot.local.yaml (gitignored), fill in proxy_server and the
+# registration secret (README step 2), then:
 #   tbot start -c tbot.local.yaml
+#
+# Why bound_keypair and not a plain token: token-joined identities can only
+# renew within their TTL (~1h), so any longer downtime strands the bot.
+# Bound keypair re-joins after ANY downtime — laptops, reboots, weekends.
 version: v2
 proxy_server: example.teleport.sh:443   # your Teleport proxy
 onboarding:
-  join_method: token
-  token: PASTE_TOKEN_FROM_tctl_bots_add
+  join_method: bound_keypair
+  token: sre-agent-bound                # the token RESOURCE name, not a secret
+  bound_keypair:
+    registration_secret: PASTE_FROM_tctl_get_token   # one-time; consumed at first join
 storage:
   type: directory
   path: ./tbot-storage

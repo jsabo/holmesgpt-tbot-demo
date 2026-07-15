@@ -71,23 +71,46 @@ kubectl create clusterrolebinding teleport-sre-agent-view \
   --clusterrole=view --group=view
 ```
 
-**2. Create the role and the bot:**
+**2. Create the role, the bot, and its bound-keypair join token.** Bound
+keypair (rather than a one-shot token) means tbot re-joins after *any*
+downtime — reboots, weekends — with no fresh tokens ever:
 
 ```bash
 tctl create -f teleport/sre-agent-role.yaml
-tctl bots add sre-agent --roles=sre-agent    # prints a one-time join token
+tctl bots add sre-agent --roles=sre-agent    # creates the bot; ignore the printed token
+
+tctl create -f - <<'EOF'
+kind: token
+version: v2
+metadata:
+  name: sre-agent-bound
+spec:
+  roles: [Bot]
+  bot_name: sre-agent
+  join_method: bound_keypair
+  bound_keypair:
+    recovery:
+      mode: relaxed        # re-join after any downtime, no attempt limit
+EOF
+
+# the one-time registration secret tbot needs for its first join:
+tctl get token/sre-agent-bound --format=json \
+  | jq -r '.[0].status.bound_keypair.registration_secret'
 ```
 
 **3. Start tbot:**
 
 ```bash
 cp tbot.yaml tbot.local.yaml    # gitignored
-# edit tbot.local.yaml: set proxy_server and paste the join token
+# edit tbot.local.yaml: set proxy_server and paste the registration secret
 tbot start -c tbot.local.yaml
 ```
 
 Leave it running. It writes `machine-id/kubeconfig.yaml` — one context per
-cluster the bot is allowed to see — and keeps the certificates renewed.
+cluster the bot is allowed to see — and keeps the certificates renewed. The
+first start consumes the registration secret and binds the keypair; from then
+on restarts just work. (Deleting `tbot-storage/` orphans the keypair — redo
+the secret step if you do.)
 
 **4. Install HolmesGPT:**
 
