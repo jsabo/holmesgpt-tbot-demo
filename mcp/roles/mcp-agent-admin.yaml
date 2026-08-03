@@ -11,3 +11,11 @@ spec:
       tier: mcp
     mcp:
       tools: ["*"]
+  options:
+    # Write access to the cluster expires on its own — no revocation step, and
+    # nothing to forget to undo after the demo.
+    max_session_ttl: 2h
+    # Uncomment to require a fresh WebAuthn/Touch ID tap before the AI client
+    # gets write tools. Left off by default so the demo runs on a cluster where
+    # the operator hasn't enrolled an MFA device:
+    # require_session_mfa: true

@@ -1,0 +1,35 @@
+# Who can approve the JIT request in Part 2.
+#
+# This is easy to miss, because two things that look like they should work don't:
+#
+#   - The built-in `reviewer` preset is seeded only with the cluster's built-in
+#     access roles, never custom ones — so it cannot approve mcp-agent-admin.
+#   - A wildcard `rules` grant (resources: ['*'], verbs: ['*']) does NOT help
+#     either: `review_requests` is a separate allow field, not a rule. An admin
+#     with full rules can approve from the CLI (`tctl request approve` takes the
+#     access_request update path) but the **Web UI review flow requires
+#     review_requests**, and the Web UI is what the demo shows.
+#
+# So somebody has to hold this role, or the "a human approves" step stalls.
+#
+# Safe to hold alongside mcp-agent-readonly: Teleport forbids self-review, so a
+# holder can approve colleagues but never their own request.
+kind: role
+version: v8
+metadata:
+  name: mcp-reviewer
+  description: "Approve/deny mcp-agent-admin elevation requests"
+spec:
+  allow:
+    review_requests:
+      roles: ["mcp-agent-admin"]
+      # Shows real resource names in the review dialog. Wildcards are rejected
+      # here by current Teleport versions — list roles explicitly.
+      preview_as_roles: ["mcp-agent-admin"]
+    rules:
+      - resources: [access_request]
+        verbs: [list, read, update, delete]
+      # An approver who cannot see what the agent actually did is only
+      # rubber-stamping.
+      - resources: [event, session]
+        verbs: [list, read]

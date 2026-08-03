@@ -206,8 +206,24 @@ cluster the agent host can reach.
 ```bash
 tctl create -f mcp/roles/mcp-agent-readonly.yaml
 tctl create -f mcp/roles/mcp-agent-admin.yaml
-tctl users update <demo-user> --set-roles=<existing-roles>,mcp-agent-readonly
+tctl create -f mcp/roles/mcp-reviewer.yaml
+tctl users update <demo-user>     --set-roles=<existing-roles>,mcp-agent-readonly
+tctl users update <approver-user> --set-roles=<existing-roles>,mcp-reviewer
 ```
+
+The approver role is not optional. Two things that look sufficient aren't: the
+built-in `reviewer` preset is seeded only with the cluster's built-in access
+roles (never custom ones), and a wildcard `rules` grant doesn't help because
+`review_requests` is a separate allow field. An admin with full rules can
+approve from the CLI (`tctl request approve`), but the **Web UI review flow —
+what step 3 below shows — requires `review_requests`**. Check what you have:
+
+```bash
+tctl get role/reviewer --format=json | jq '.[0].spec.allow.review_requests'
+```
+
+The approver must also be a different user from the requester: Teleport forbids
+self-review.
 
 **3. Connect the AI client** (as the demo user):
 
