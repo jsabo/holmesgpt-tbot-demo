@@ -33,4 +33,8 @@ services:
     destination:
       type: directory
       path: ./machine-id
-      symlinks: insecure   # quiets a cosmetic macOS warning; absent on Linux
+      # Quiets tbot's own cosmetic macOS symlink warning. The kubeconfig's
+      # credential plugin (`tbot kube credentials`) still prints one WARN per
+      # kubectl call on macOS — it builds its destination from the bare path
+      # and no config reaches it (upstream TODO). Cosmetic; absent on Linux.
+      symlinks: insecure

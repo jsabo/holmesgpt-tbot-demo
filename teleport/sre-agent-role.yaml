@@ -3,8 +3,11 @@
 #   kubernetes_labels    → which clusters exist for the bot (env=prod never
 #                          matches: production is invisible, not just denied)
 #   kubernetes_resources → read-only verbs
-#   kubernetes_groups    → impersonated on the kube API; bind "view" to the
-#                          built-in view ClusterRole per cluster (README step 1)
+#   kubernetes_groups    → impersonated on the kube API; bind teleport-readonly
+#                          to the built-in "view" ClusterRole once per cluster
+#                          (README step 1). If your clusters already bind a
+#                          read-only group for Teleport, put that group here
+#                          instead and skip the binding.
 kind: role
 version: v8
 metadata:
@@ -14,7 +17,7 @@ spec:
   allow:
     kubernetes_labels:
       env: ["dev", "demo"]
-    kubernetes_groups: ["view"]
+    kubernetes_groups: ["teleport-readonly"]
     kubernetes_resources:
       - kind: "*"
         api_group: "*"

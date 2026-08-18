@@ -1,35 +1,16 @@
-# Governing AI agents with Teleport: identity, RBAC, and audit
+# Machine & Workload Identity for AI agents: HolmesGPT + Teleport tbot
 
-AI agents are touching infrastructure two ways today: **autonomous agents**
-(an AI SRE investigating alerts on its own) and **interactive agents** (Claude
-Code, Cursor, and friends calling tools over MCP on a human's behalf). Both
-raise the same three questions: *what credentials does the AI use, what can it
-touch, and who can prove what it did?*
+An autonomous AI agent touching your infrastructure raises three questions:
+*what credentials does it use, what can it touch, and who can prove what it
+did?* This repo answers all three with **Teleport Machine & Workload
+Identity**, using a real workload worth governing: an AI SRE
+([HolmesGPT](https://holmesgpt.dev)) that investigates Kubernetes incidents on
+its own.
 
-This repo demos Teleport answering all three, for both kinds of agent:
-
-- **Part 1 — autonomous:** [HolmesGPT](https://holmesgpt.dev) investigates a
-  crashing pod using its **own machine identity** (`tbot`), scoped by a
-  Teleport role, every kubectl call audited as `bot-sre-agent`.
-- **Part 2 — interactive:** an MCP server enrolled behind Teleport, with
-  **per-tool RBAC** (the agent literally cannot see denied tools), just-in-time
-  elevation a human approves, and per-tool-call audit.
-
-```
-teleport/sre-agent-role.yaml   the autonomous bot's guardrails (Part 1)
-tbot.yaml                      machine-identity config → kubeconfig (Part 1)
-k8s/broken-pod.yaml            canned incident for HolmesGPT to solve (Part 1)
-mcp/app-snippet.yaml           enroll an MCP server behind Teleport (Part 2)
-mcp/roles/                     per-tool RBAC: read-only + JIT admin (Part 2)
-```
-
----
-
-## Part 1 — Autonomous agent: HolmesGPT + Machine ID
-
-- **Its own identity, not a borrowed one.** `tbot` joins Teleport as bot
-  `sre-agent` and maintains short-lived certificates — no long-lived
-  kubeconfig, no human's credentials, nothing to leak.
+- **Its own identity, not a borrowed one.** The workload joins Teleport as bot
+  `sre-agent` with a **bound keypair** — no long-lived kubeconfig, no API key,
+  no human's credentials, nothing to leak. `tbot` keeps short-lived
+  certificates renewed automatically and re-joins after *any* downtime.
 - **Scoped by a Teleport role.** The bot sees only `env=dev`/`env=demo`
   clusters (production is *invisible*, not just forbidden) and holds read-only
   verbs — enforced at Teleport's proxy, regardless of what the LLM decides to
@@ -37,6 +18,12 @@ mcp/roles/                     per-tool RBAC: read-only + JIT admin (Part 2)
 - **Fully audited.** Every kubectl call HolmesGPT makes is a `kube.request`
   audit event attributed to `bot-sre-agent`, in the same audit log as your
   humans.
+
+```
+teleport/sre-agent-role.yaml   the bot's guardrails (RBAC)
+tbot.yaml                      machine-identity config → auto-renewed kubeconfig
+k8s/broken-pod.yaml            canned incident for HolmesGPT to solve
+```
 
 ```
 ┌─ agent host ──────────────────────────────┐
@@ -48,7 +35,7 @@ mcp/roles/                     per-tool RBAC: read-only + JIT admin (Part 2)
 └───────────────────────────────────────────┘                        └────────────┘
 ```
 
-### Prerequisites
+## Prerequisites
 
 - A Teleport cluster (v16+) with at least one Kubernetes cluster
   [enrolled](https://goteleport.com/docs/enroll-resources/kubernetes-access/getting-started/),
@@ -59,16 +46,18 @@ mcp/roles/                     per-tool RBAC: read-only + JIT admin (Part 2)
 - `kubectl`, and LLM credentials for HolmesGPT — an Anthropic API key or AWS
   Bedrock access (any [LiteLLM-supported](https://holmesgpt.dev) provider works)
 
-### Setup
+## Setup
 
 **1. Bind the bot's group inside each allowed cluster.** The Teleport role
-impersonates the Kubernetes group `view`; bind it to the built-in `view`
-ClusterRole once per dev/demo cluster (as a human admin):
+impersonates the Kubernetes group `teleport-readonly`; bind it to the built-in
+`view` ClusterRole once per dev/demo cluster (as a human admin). If your
+clusters already carry a read-only group binding for Teleport, skip this and
+set that group in the role instead:
 
 ```bash
 tsh kube login <cluster>
-kubectl create clusterrolebinding teleport-sre-agent-view \
-  --clusterrole=view --group=view
+kubectl create clusterrolebinding teleport-readonly \
+  --clusterrole=view --group=teleport-readonly
 ```
 
 **2. Create the role, the bot, and its bound-keypair join token.** Bound
@@ -131,7 +120,7 @@ export ANTHROPIC_API_KEY=<your key>            # --model="anthropic/claude-sonne
 export AWS_DEFAULT_REGION=us-east-2            # --model="bedrock/us.anthropic.claude-sonnet-4-6"
 ```
 
-### The demo
+## The demo
 
 **The bot is an identity, not a credential file:**
 
@@ -181,98 +170,29 @@ tctl lock --user=bot-sre-agent --message="agent misbehaving" --ttl=5m
 
 The agent's access dies cluster-wide, mid-investigation, instantly.
 
----
-
-## Part 2 — Interactive agents: MCP with per-tool RBAC
-
-The same governance for agents a human drives (Claude Code, Claude Desktop,
-Cursor): enroll the MCP server behind Teleport once; every user's AI gets one
-config entry, and Teleport enforces *which tools* each identity may call —
-auditing every call with its arguments.
-
-A key difference from Part 1: here the AI rides a **human login** (`tsh login`
-underneath), so just-in-time elevation works — the *human* requests a role and
-their AI inherits it. Bot identities cannot make Access Requests, which is why
-Part 1's agent has fixed privileges and hands off to a human instead.
-
-### Setup (~10 minutes, reuses an existing Teleport agent)
-
-**1. Enroll the MCP server** — merge `mcp/app-snippet.yaml` into an existing
-agent's `teleport.yaml` and restart it. Point `--kubeconfig` at any demo
-cluster the agent host can reach.
-
-**2. Create the roles:**
-
-```bash
-tctl create -f mcp/roles/mcp-agent-readonly.yaml
-tctl create -f mcp/roles/mcp-agent-admin.yaml
-tctl create -f mcp/roles/mcp-reviewer.yaml
-tctl users update <demo-user>     --set-roles=<existing-roles>,mcp-agent-readonly
-tctl users update <approver-user> --set-roles=<existing-roles>,mcp-reviewer
-```
-
-The approver role is not optional. Two things that look sufficient aren't: the
-built-in `reviewer` preset is seeded only with the cluster's built-in access
-roles (never custom ones), and a wildcard `rules` grant doesn't help because
-`review_requests` is a separate allow field. An admin with full rules can
-approve from the CLI (`tctl request approve`), but the **Web UI review flow —
-what step 3 below shows — requires `review_requests`**. Check what you have:
-
-```bash
-tctl get role/reviewer --format=json | jq '.[0].spec.allow.review_requests'
-```
-
-The approver must also be a different user from the requester: Teleport forbids
-self-review.
-
-**3. Connect the AI client** (as the demo user):
-
-```bash
-tsh login --proxy=<cluster> --user=<demo-user>
-tsh mcp ls                                        # allowed tools per server
-tsh mcp config kubernetes-mcp --client-config=claude   # writes the client entry
-```
-
-### The demo
-
-1. **RBAC**: list MCP tools in the client — only `*_list` / `*_get` /
-   `pods_log` etc. are visible. Ask the AI to *"delete pod X"* — the tool
-   isn't even offered; a forced call is denied. Teleport filtered the toolset
-   by role, server-side.
-2. **Audit**: Web UI → Audit Log → filter `mcp.session.request`. Every tool
-   call the agent made is there, arguments included; denied calls show
-   `success: false`.
-3. **JIT**: `tsh request create --roles mcp-agent-admin --reason "disk full incident"`
-   → a human approves in the Web UI (optionally adjusting duration) →
-   reconnect the MCP session → **the tool list visibly grows** → the
-   delete/scale now succeeds, and is audited.
-
-Note deny rules win: `pods_exec` / `nodes_debug_exec` stay blocked for
-`mcp-agent-readonly` holders even while the requested admin role is active —
-full access arrives only because the admin role itself carries no deny.
-
----
-
 ## Notes
 
-- **Bots cannot make Access Requests** — by design, so there is no JIT for the
-  Part 1 agent itself. When it needs a destructive fix, it hands off to a
-  human, who elevates through the normal just-in-time approval flow (MFA,
-  approvers, session recording). Agents diagnose; humans approve destruction.
-  (To change a bot's privileges, an admin runs
+- **Bots cannot make Access Requests** — by design, so the agent has no path
+  to elevate itself. When the diagnosis calls for a destructive fix, it hands
+  off to a human, who elevates through the normal just-in-time approval flow
+  (MFA, approvers, session recording). Agents diagnose; humans approve
+  destruction. (To change a bot's privileges, an admin runs
   `tctl bots update <bot> --add-roles <role>` — explicit and audited, not a
-  request. Part 2's JIT works because that path rides a human login.)
+  request.)
 - The tbot output works for anything that speaks kubeconfig — Helm, ArgoCD,
-  k9s, your own scripts — Part 1 just happens to hand it to an AI.
+  k9s, your own scripts — this demo just happens to hand it to an AI.
+- On macOS, every kubectl call through the bot's kubeconfig prints one
+  cosmetic `Secure symlinks not supported` WARN on stderr. It comes from the
+  kubeconfig's credential plugin, which no configuration reaches (secure
+  symlinks are a Linux-only hardening; the plugin can't be told to skip the
+  attempt). Harmless — pipe through `grep -v WARN` for clean demo output;
+  it does not exist on Linux.
 - HolmesGPT has other toolsets (Prometheus, PagerDuty, …); the pattern here
   gates its Kubernetes access. Whatever the model hallucinates, the role is
   enforced server-side.
-- MCP tool names in the roles match kubernetes-mcp-server /
-  openshift-mcp-server; verify against `tsh mcp ls` after enrolling.
 
 ## References
 
 - [Machine & Workload Identity — Kubernetes access guide](https://goteleport.com/docs/machine-workload-identity/access-guides/kubernetes/)
-- [MCP access — tool RBAC](https://goteleport.com/docs/enroll-resources/mcp-access/rbac/)
 - [Teleport Kubernetes RBAC](https://goteleport.com/docs/enroll-resources/kubernetes-access/controls/)
 - [HolmesGPT documentation](https://holmesgpt.dev)
