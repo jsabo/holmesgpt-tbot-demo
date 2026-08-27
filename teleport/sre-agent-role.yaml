@@ -18,9 +18,17 @@ spec:
     kubernetes_labels:
       env: ["dev", "demo"]
     kubernetes_groups: ["teleport-readonly"]
+    # Teleport passes every verb through; Kubernetes decides. The impersonated
+    # teleport-readonly group is bound to the built-in "view" ClusterRole, so a
+    # write is refused by the API server with a 403 -- and a 403 is recorded as
+    # a kube.request audit event.
+    #
+    # Restricting the verbs here instead would refuse the write at the proxy,
+    # before it reaches the cluster, and no audit event would exist. Being able
+    # to show the refusal is worth more than refusing it one hop earlier.
     kubernetes_resources:
       - kind: "*"
         api_group: "*"
         namespace: "*"
         name: "*"
-        verbs: ["get", "list", "watch"]
+        verbs: ["*"]
