@@ -12,9 +12,10 @@ its own.
   no human's credentials, nothing to leak. `tbot` keeps short-lived
   certificates renewed automatically and re-joins after *any* downtime.
 - **Scoped by a Teleport role.** The bot sees only `env=dev`/`env=demo`
-  clusters (production is *invisible*, not just forbidden) and holds read-only
-  verbs — enforced at Teleport's proxy, regardless of what the LLM decides to
-  try.
+  clusters (production is *invisible*, not just forbidden). Teleport decides
+  which clusters exist for it; **Kubernetes decides what it may do there**, via
+  the impersonated `teleport-readonly` group bound to the built-in `view` role.
+  That split is deliberate — see the note on auditable denials below.
 - **Fully audited.** Every kubectl call HolmesGPT makes is a `kube.request`
   audit event attributed to `bot-sre-agent`, in the same audit log as your
   humans.
@@ -29,9 +30,10 @@ k8s/broken-pod.yaml            canned incident for HolmesGPT to solve
 ┌─ agent host ──────────────────────────────┐
 │  HolmesGPT ──(KUBECONFIG)──┐              │        Teleport         kube clusters
 │                            ▼              │   ┌───────────────┐    ┌────────────┐
-│  machine-id/kubeconfig.yaml ──────────────┼──►│ proxy ── RBAC │───►│ env=dev  ✓ │
-│                            ▲              │   │        + audit│    │ env=demo ✓ │
+│  machine-id/kubeconfig.yaml ──────────────┼──►│ proxy: which  │───►│ env=dev  ✓ │
+│                            ▲              │   │ clusters+audit│    │ env=demo ✓ │
 │  tbot (bot: sre-agent) ────┘ auto-renewed │   └───────────────┘    │ env=prod ✗ │
+│                                           │    kube RBAC: what     │  view only │
 └───────────────────────────────────────────┘                        └────────────┘
 ```
 
@@ -157,10 +159,11 @@ planted root cause: the payment service can't reach its database.
 **Then show the receipts.** In the Teleport Web UI → Audit Log, filter for
 user `bot-sre-agent`: every API call from the investigation, each one a
 `kube.request` event carrying `bot_name: sre-agent` — side by side with your
-human sessions, in one audit trail. (Note: `kube.request` records forwarded
-requests with the upstream status — kube-side denials show as 403s; calls
-rejected by Teleport's own role, like the delete above, are refused at the
-proxy and surface in the client error rather than as an audit row.)
+human sessions, in one audit trail. **The refused delete is in there too, as a
+403.** That is why the read-only ceiling is enforced by Kubernetes RBAC rather
+than by Teleport's resource filter: a call Teleport refuses at the proxy never
+reaches the cluster and leaves no audit event, so you would have no record that
+the agent tried. We put the enforcement where it produces evidence.
 
 **Optional closer — the kill switch:**
 
@@ -172,13 +175,11 @@ The agent's access dies cluster-wide, mid-investigation, instantly.
 
 ## Notes
 
-- **Bots cannot make Access Requests** — by design, so the agent has no path
-  to elevate itself. When the diagnosis calls for a destructive fix, it hands
-  off to a human, who elevates through the normal just-in-time approval flow
-  (MFA, approvers, session recording). Agents diagnose; humans approve
-  destruction. (To change a bot's privileges, an admin runs
-  `tctl bots update <bot> --add-roles <role>` — explicit and audited, not a
-  request.)
+- **This bot holds no write access, and cannot grant itself any.** A bot has no
+  `allow.request` by default, so out of the box it cannot ask for more, and
+  `tbot` has no Access Request support in any released version. When the
+  diagnosis calls for a fix, a human makes it through the normal just-in-time
+  approval flow. Agents diagnose; humans change things.
 - The tbot output works for anything that speaks kubeconfig — Helm, ArgoCD,
   k9s, your own scripts — this demo just happens to hand it to an AI.
 - On macOS, every kubectl call through the bot's kubeconfig prints one

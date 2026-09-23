@@ -32,3 +32,8 @@ spec:
         namespace: "*"
         name: "*"
         verbs: ["*"]
+
+# There is deliberately no `request:` block here. A bot's ability to ASK for more
+# is granted on its own auto-generated role (`bot-sre-agent`), not on the role it
+# holds -- so adding it here would have no effect. This role is the read-only
+# ceiling and nothing else.
